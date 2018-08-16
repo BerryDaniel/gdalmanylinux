@@ -1,10 +1,4 @@
-# An image for building manylinux1 wheels equivalent to those that
-# https://github.com/sgillies/frs-wheel-builds makes for macosx.
-#
-# TODO: Figure out how to make the builds for osx!
-#
-# Note well: a very limited set of format drivers are included in these
-# wheels. See the GDAL configuration below for details.
+# An image for building manylinux1 wheels
 
 FROM quay.io/pypa/manylinux1_x86_64
 
@@ -17,11 +11,11 @@ RUN yum update -y && yum install -y curl-devel json-c-devel zlib-devel libtiff-d
 # Install openssl
 RUN mkdir -p /src \
     && cd /src \
-    && curl -f -L -O https://www.openssl.org/source/openssl-1.0.2o.tar.gz \
-    && echo "ec3f5c9714ba0fd45cb4e087301eb1336c317e0d20b575a125050470e8089e4d  openssl-1.0.2o.tar.gz" > checksum \
+    && curl -f -L -O https://s3.amazonaws.com/boundless-cloudfoundry/src/openssl-1.0.2p.tar.gz \
+    && echo "50a98e07b1a89eb8f6a99477f262df71c6fa7bef77df4dc83025a2845c827d00  openssl-1.0.2p.tar.gz" > checksum \
     && sha256sum -c checksum \
-    && tar zxf openssl-1.0.2o.tar.gz \
-    && cd /src/openssl-1.0.2o \
+    && tar zxf openssl-1.0.2p.tar.gz \
+    && cd /src/openssl-1.0.2p \
     && ./config no-shared no-ssl2 no-async -fPIC -O2 \
     && make -j 4 \
     && make install \
@@ -41,9 +35,9 @@ RUN mkdir -p /src \
 # Install geos
 RUN mkdir -p /src \
     && cd /src \
-    && curl -f -L -O http://download.osgeo.org/geos/geos-3.6.2.tar.bz2 \
-    && tar jxf geos-3.6.2.tar.bz2 \
-    && cd /src/geos-3.6.2 \
+    && curl -f -L -O http://download.osgeo.org/geos/geos-3.6.0.tar.bz2 \
+    && tar jxf geos-3.6.0.tar.bz2 \
+    && cd /src/geos-3.6.0 \
     && CFLAGS="-O2 -Wl,-S" CXXFLAGS="-O2 -Wl,-S" ./configure \
     && make -j 4 \
     && make install \
@@ -79,10 +73,38 @@ RUN cd /usr/local/src \
     && ./bootstrap --prefix=/usr/local/cmake \
     && make -j 4; make install
 
+# postgresql client
+RUN mkdir -p /src \
+    && cd /src \
+    && curl -f -L -O https://s3.amazonaws.com/boundless-cloudfoundry/src/postgresql-9.6.1.tar.gz \
+    && tar xzf postgresql-9.6.1.tar.gz \
+    && cd postgresql-9.6.1 \
+    && sed --in-place '/fmgroids/d' src/include/Makefile \
+    && ./configure CFLAGS="-O2 -Wl,-S" --prefix=/usr/local --without-readline \
+    && make -C src/bin -j 4 install \
+    && make -C src/include -j 4 install \
+    && make -C src/interfaces -j 4 install
+
+# Install libkml
+RUN mkdir -p /src \
+    && cd /src \
+    && curl -f -L -O https://s3.amazonaws.com/boundless-cloudfoundry/src/libkml-1.3.0.tar.gz \
+    && tar xzf libkml-1.3.0.tar.gz \
+    && cd libkml-1.3.0 \
+    && sed -i "s|typedef voidpf|/**typedef voidpf|" src/kml/base/contrib/minizip/iomem_simple.h \
+    && sed -i "/KMR/d" src/kml/base/contrib/minizip/iomem_simple.h \
+    && sed -i "s|zlib.net|zlib.net/fossils|" cmake/External_zlib.cmake \
+    && mkdir -p build \
+    && cd build \
+    && /usr/local/cmake/bin/cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local \
+    && make -j 4 install \
+    && make clean \
+    && rm -rf /src
+
 # openjpeg
 RUN mkdir -p /src \
     && cd /src \
-    && curl -f -L -O https://github.com/uclouvain/openjpeg/archive/v2.3.0.tar.gz \
+    && curl -f -L -O https://s3.amazonaws.com/boundless-cloudfoundry/src/openjpeg/v2.3.0.tar.gz \
     && tar xzf v2.3.0.tar.gz \
     && cd /src/openjpeg-2.3.0 \
     && mkdir -p build \
@@ -131,9 +153,9 @@ RUN cd /usr/local/src \
 # gdal
 RUN mkdir -p /src \
     && cd /src \
-    && curl -f -L -O http://download.osgeo.org/gdal/2.3.0/gdal-2.3.0.tar.gz \
-    && tar xzf gdal-2.3.0.tar.gz \
-    && cd /src/gdal-2.3.0 \
+    && curl -f -L -O http://download.osgeo.org/gdal/2.1.2/gdal-2.1.2.tar.gz \
+    && tar xzf gdal-2.1.2.tar.gz \
+    && cd /src/gdal-2.1.2 \
     && CFLAGS="-O2 -Wl,-S" CXXFLAGS="-O2 -Wl,-S" ./configure \
         --with-threads \
         --disable-debug \
@@ -158,10 +180,13 @@ RUN mkdir -p /src \
         --with-expat=/usr/local \
         --with-libjson-c \
         --with-libiconv-prefix=/usr \
+        --with-libkml=/usr/local \
+        --with-libkml-inc=/usr/local/include/kml \
         --with-libz=/usr \
         --with-curl=/usr/local/bin/curl-config \
         --with-netcdf=/usr/local/netcdf \
         --with-openjpeg \
+        --with-pg=/usr/local/bin/pg_config \
         --with-jasper=/usr/local \
         --without-python \
         --without-hdf4 \
@@ -178,14 +203,13 @@ RUN for PYBIN in /opt/python/*/bin; do \
         $PYBIN/pip install -r /tmp/requirements.txt ; \
     done
 
-# Replace SWIG's setup.py with this modified one, which gets numpy in
-# there as a dependency.
-ADD setup.py /src/gdal-2.3.0/swig/python/setup.py
+# Replace SWIG's setup.py with this modified one.
+ADD setup.py /src/gdal-2.1.2/swig/python/setup.py
 
 # Replace the osgeo module __init__.py with this modified one, which
 # sets the GDAL_DATA and PROJ_LIB variables on import to where they've
 # been copied to.
-ADD gdalinit.py /src/gdal-2.3.0/swig/python/osgeo/__init__.py
+ADD gdalinit.py /src/gdal-2.1.2/swig/python/osgeo/__init__.py
 
 WORKDIR /io
 CMD ["/io/build-linux-wheels.sh"]
