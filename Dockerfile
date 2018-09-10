@@ -8,86 +8,75 @@ RUN sed -i 's/enabled=1/enabled=0/' /etc/yum/pluginconf.d/fastestmirror.conf \
 
 RUN yum update -y && yum install -y curl-devel json-c-devel zlib-devel libtiff-devel
 
-# Install openssl
-RUN mkdir -p /src \
-    && cd /src \
-    && curl -f -L -O https://s3.amazonaws.com/boundless-cloudfoundry/src/openssl-1.0.2p.tar.gz \
-    && echo "50a98e07b1a89eb8f6a99477f262df71c6fa7bef77df4dc83025a2845c827d00  openssl-1.0.2p.tar.gz" > checksum \
-    && sha256sum -c checksum \
-    && tar zxf openssl-1.0.2p.tar.gz \
-    && cd /src/openssl-1.0.2p \
-    && ./config no-shared no-ssl2 no-async -fPIC -O2 \
-    && make -j 4 \
-    && make install \
-    && rm -rf /src
-
-# Install curl
-RUN mkdir -p /src \
-    && cd /src \
-    && curl -f -L -O http://curl.askapache.com/download/curl-7.59.0.tar.bz2 \
-    && tar jxf curl-7.59.0.tar.bz2 \
-    && cd /src/curl-7.59.0 \
-    && LIBS=-ldl CFLAGS="-O2 -Wl,-S" ./configure --with-ssl=/usr/local/ssl \
-    && make -j 4 \
-    && make install \
-    && rm -rf /src
-
-# Install geos
-RUN mkdir -p /src \
-    && cd /src \
-    && curl -f -L -O http://download.osgeo.org/geos/geos-3.6.0.tar.bz2 \
-    && tar jxf geos-3.6.0.tar.bz2 \
-    && cd /src/geos-3.6.0 \
-    && CFLAGS="-O2 -Wl,-S" CXXFLAGS="-O2 -Wl,-S" ./configure \
-    && make -j 4 \
-    && make install \
-    && rm -rf /src
-
-# Install jasper
-RUN mkdir -p /src \
-    && cd /src \
-    && curl -f -L -O http://download.osgeo.org/gdal/jasper-1.900.1.uuid.tar.gz \
-    && tar xzf jasper-1.900.1.uuid.tar.gz \
-    && cd /src/jasper-1.900.1.uuid \
-    && ./configure --disable-debug --enable-shared \
-    && make -j 4 \
-    && make install \
-    && rm -rf /src
-
-# proj4
-RUN mkdir -p /src \
-    && cd /src \
-    && curl -f -L -O http://download.osgeo.org/proj/proj-4.9.3.tar.gz \
-    && tar xzf proj-4.9.3.tar.gz \
-    && cd /src/proj-4.9.3 \
-    && ./configure CFLAGS="-O2 -Wl,-S" \
-    && make -j 4 \
-    && make install \
-    && rm -rf /src
-
 # cmake
 RUN cd /usr/local/src \
     && curl -f -L -O http://www.cmake.org/files/v3.11/cmake-3.11.1.tar.gz \
     && tar xzf cmake-3.11.1.tar.gz \
     && cd cmake-3.11.1 \
     && ./bootstrap --prefix=/usr/local/cmake \
-    && make -j 4; make install
+    && make -j 4 \
+    && make install
+
+# Install openssl
+RUN cd /usr/local/src \
+    && curl -f -L -O https://s3.amazonaws.com/boundless-cloudfoundry/src/openssl-1.0.2p.tar.gz \
+    && echo "50a98e07b1a89eb8f6a99477f262df71c6fa7bef77df4dc83025a2845c827d00  openssl-1.0.2p.tar.gz" > checksum \
+    && sha256sum -c checksum \
+    && tar zxf openssl-1.0.2p.tar.gz \
+    && cd openssl-1.0.2p \
+    && ./config no-shared no-ssl2 no-async -fPIC -O2 \
+    && make -j 4 \
+    && make install
+
+# Install curl
+RUN mkdir -p /usr/local/src \
+    && cd /usr/local/src \
+    && curl -f -L -O http://curl.askapache.com/download/curl-7.59.0.tar.bz2 \
+    && tar jxf curl-7.59.0.tar.bz2 \
+    && cd curl-7.59.0 \
+    && LIBS=-ldl CFLAGS="-O2 -Wl,-S" ./configure --with-ssl=/usr/local/ssl \
+    && make -j 4 \
+    && make install
+
+# Install geos
+RUN cd /usr/local/src \
+    && curl -f -L -O http://download.osgeo.org/geos/geos-3.6.0.tar.bz2 \
+    && tar jxf geos-3.6.0.tar.bz2 \
+    && cd geos-3.6.0 \
+    && CFLAGS="-O2 -Wl,-S" CXXFLAGS="-O2 -Wl,-S" ./configure \
+    && make -j 4 \
+    && make install
+
+# Install jasper
+RUN cd /usr/local/src \
+    && curl -f -L -O http://download.osgeo.org/gdal/jasper-1.900.1.uuid.tar.gz \
+    && tar xzf jasper-1.900.1.uuid.tar.gz \
+    && cd jasper-1.900.1.uuid \
+    && ./configure --disable-debug --enable-shared \
+    && make -j 4 \
+    && make install
+
+# proj4
+RUN cd /usr/local/src \
+    && curl -f -L -O http://download.osgeo.org/proj/proj-4.9.3.tar.gz \
+    && tar xzf proj-4.9.3.tar.gz \
+    && cd proj-4.9.3 \
+    && ./configure CFLAGS="-O2 -Wl,-S" \
+    && make -j 4 \
+    && make install
 
 # postgresql client
-RUN mkdir -p /src \
-    && cd /src \
+RUN cd /usr/local/src \
     && curl -f -L -O https://s3.amazonaws.com/boundless-cloudfoundry/src/postgresql-9.6.1.tar.gz \
     && tar xzf postgresql-9.6.1.tar.gz \
     && cd postgresql-9.6.1 \
     && sed --in-place '/fmgroids/d' src/include/Makefile \
     && ./configure CFLAGS="-O2 -Wl,-S" --prefix=/usr/local --without-readline \
-    && make -C src/bin -j 4 install \
-    && make -C src/include -j 4 install \
-    && make -C src/interfaces -j 4 install
+    && make -j 4 \
+    && make install
 
 # Install libkml
-RUN mkdir -p /src \
-    && cd /src \
+RUN cd /usr/local/src \
     && curl -f -L -O https://s3.amazonaws.com/boundless-cloudfoundry/src/libkml-1.3.0.tar.gz \
     && tar xzf libkml-1.3.0.tar.gz \
     && cd libkml-1.3.0 \
@@ -98,21 +87,7 @@ RUN mkdir -p /src \
     && cd build \
     && /usr/local/cmake/bin/cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local \
     && make -j 4 install \
-    && make clean \
-    && rm -rf /src
-
-# openjpeg
-RUN mkdir -p /src \
-    && cd /src \
-    && curl -f -L -O https://s3.amazonaws.com/boundless-cloudfoundry/src/openjpeg/v2.3.0.tar.gz \
-    && tar xzf v2.3.0.tar.gz \
-    && cd /src/openjpeg-2.3.0 \
-    && mkdir -p build \
-    && cd build \
-    && /usr/local/cmake/bin/cmake .. -DBUILD_THIRDPARTY:BOOL=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local \
-    && make -j 4 install \
-    && make clean \
-    && rm -rf /src
+    && make clean
 
 # hdf
 RUN cd /usr/local/src \
@@ -151,11 +126,10 @@ RUN cd /usr/local/src \
     && make install
 
 # gdal
-RUN mkdir -p /src \
-    && cd /src \
-    && curl -f -L -O http://download.osgeo.org/gdal/2.1.2/gdal-2.1.2.tar.gz \
-    && tar xzf gdal-2.1.2.tar.gz \
-    && cd /src/gdal-2.1.2 \
+RUN cd /usr/local/src \
+    && curl -f -L -O http://download.osgeo.org/gdal/2.3.1/gdal-2.3.1.tar.gz \
+    && tar xzf gdal-2.3.1.tar.gz \
+    && cd gdal-2.3.1 \
     && CFLAGS="-O2 -Wl,-S" CXXFLAGS="-O2 -Wl,-S" ./configure \
         --with-threads \
         --disable-debug \
@@ -185,7 +159,6 @@ RUN mkdir -p /src \
         --with-libz=/usr \
         --with-curl=/usr/local/bin/curl-config \
         --with-netcdf=/usr/local/netcdf \
-        --with-openjpeg \
         --with-pg=/usr/local/bin/pg_config \
         --with-jasper=/usr/local \
         --without-python \
@@ -204,12 +177,12 @@ RUN for PYBIN in /opt/python/*/bin; do \
     done
 
 # Replace SWIG's setup.py with this modified one.
-ADD setup.py /src/gdal-2.1.2/swig/python/setup.py
+ADD setup.py /usr/local/src/gdal-2.3.1/swig/python/setup.py
 
 # Replace the osgeo module __init__.py with this modified one, which
 # sets the GDAL_DATA and PROJ_LIB variables on import to where they've
 # been copied to.
-ADD gdalinit.py /src/gdal-2.1.2/swig/python/osgeo/__init__.py
+ADD gdalinit.py /usr/local/src/gdal-2.3.1/swig/python/osgeo/__init__.py
 
 WORKDIR /io
 CMD ["/io/build-linux-wheels.sh"]
